@@ -1,34 +1,60 @@
 import socket
-import threading 
+import threading
 
-FILE_PATH = "./data/test.txt"
-HOST = ""
-PORT = 9090
+HOST=""
+PORT=9090
+CONNECTIONS=[]
 
-def handleConnections(client, addr):
-    print(f"{addr} is now connected to me!")
-    
-    instruction = client.recv(3).decode() #Receive instruction from the client. Currently only GET is supported
-       
-    if(instruction=="GET"):
-        with open(FILE_PATH, "r") as file:
-            data = file.read()
-            data = data+"<EOF>"
-        client.sendall(data.encode())
-        print(f"File sent to {addr}")
+UNICAST_MESSAGE = "This is a unicast message and is sent to the first client that connected to this server"
+MULTICAST_MESSAGE = "This is a multicast message and is sent to n/2 clients connected to this server; where n is the number of total connections"
+BROADCAST_MESSAGE = "This is a broadcast message and is sent to all the clients connected to this server"
+
+def thread_connection():
+    while True:
+        client, addr = server.accept()
+        print(f"\n{addr} connected to the server")
+        CONNECTIONS.append((client, addr))
+
+def server_connection():
+    while True:
+        instruction = input("instruction: ")
+        if(instruction == "UNI"):
+            if(len(CONNECTIONS)!=0):
+                CONNECTIONS[0][0].send(UNICAST_MESSAGE.encode())
+            else:
+                print("No clients are connected...")
+        elif(instruction == "BRD"):
+            if(len(CONNECTIONS)!=0):
+                for CONNECTION in CONNECTIONS:
+                    CONNECTION[0].send(BROADCAST_MESSAGE.encode())
+            else:
+                print("No clients are connected...")
+        elif(instruction == "MUL"):
+            if(len(CONNECTIONS)!=0):
+                for i in range(0,len(CONNECTIONS)//2):
+                    CONNECTIONS[i][0].send(MULTICAST_MESSAGE.encode())
+            else:
+                print("No clients are connected...")
+        elif(instruction == "LST"):
+            if(len(CONNECTIONS)!=0):
+                i=1
+                for CONNECTION in CONNECTIONS:
+                    print(f"{i}. {CONNECTION[1]}")
+                    i+=1
+            else:
+                print("No clients are connected...")
 
 try:
     server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((HOST, PORT))
-    server.listen(5) #Listen for incoming connections
-    print(f"Server is listening on port {PORT}")
+    server.bind((HOST,PORT))
+    server.listen(5)
+    print(f"Server started on port {PORT}")
+    thread1 = threading.Thread(target=thread_connection)
+    thread2 = threading.Thread(target=server_connection)
+    thread1.start()
+    thread2.start()
 
-    while True:
-        client, addr = server.accept(); #Catch the incoming connections
-        thread = threading.Thread(target=handleConnections, args=(client, addr))
-        thread.start()
-        
-except Exception as e:
+except Exception as err:
     print("Connection terminated!")
-    print(e)
+    print(err)
 
